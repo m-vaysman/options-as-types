@@ -103,12 +103,6 @@ the remaining boilerplate but do not move that ceiling.
 This lands in well-populated territory, reached from the domain side rather than the
 language-theory side:
 
-- **Primitive obsession** — the smell being reacted to (Fowler, Beck)
-- **Value objects**, narrowed to *tiny types* — Evans, DDD
-- **Newtype** — Haskell's `newtype`, Rust's newtype idiom
-- **Make illegal states unrepresentable** — Yaron Minsky, argued for financial code in OCaml at Jane Street
-- **Parse, don't validate** — Alexis King; the validating constructors here
-- **Dimension types / units of measure** — Andrew Kennedy's 1996 thesis, later F# `[<Measure>]`
 
 ## Layout
 
