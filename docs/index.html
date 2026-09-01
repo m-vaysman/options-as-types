@@ -170,9 +170,7 @@
 
 <p>Let me get the disclaimer out of the way, because it matters for how you read the rest. <strong>I am not a quant.</strong> I have never derived a model. I could not defend a choice of numeraire and I&rsquo;m not going to pretend otherwise. I&rsquo;ve spent seventeen years in and around capital markets, mostly on the engineering side, and my job has generally been the code that still has to work on the Monday after the person who wrote it moved desks.</p>
 
-<p>So I don&rsquo;t look at that file and think about the mathematics. I look at it and think about risk surface. How many ways can this be wrong without anybody noticing? That&rsquo;s the only lens I have, and it&rsquo;s the lens this whole thing came out of.</p>
-
-<p>This wasn&rsquo;t a language experiment for its own sake. It was a genuine attempt to put a better idea on the table for maintainability &mdash; to push as much of the checking as possible onto the compiler, because the compiler is the only reviewer that never gets tired, never gets rushed the day before a release, and never assumes somebody else already looked at it. Everything a type can enforce is something a human no longer has to remember to check. That seemed worth trying to prove out rather than just assert.</p>
+<p>So I don&rsquo;t look at that file and think about the mathematics. I look at it and think about risk surface: how many ways can this be wrong without anybody noticing? That&rsquo;s the only lens I have, and what came out of it wasn&rsquo;t a language experiment for its own sake. It was an attempt to put a better idea on the table for maintainability &mdash; to push as much of the checking as possible onto the compiler, because the compiler is the only reviewer that never gets tired, never gets rushed the day before a release, and never assumes somebody else already looked at it. Everything a type can enforce is something a human no longer has to remember to check.</p>
 
 <h2>The fix that doesn&rsquo;t work</h2>
 
@@ -189,10 +187,11 @@
 <pre><code>var spot   = new S(52.0);
 var strike = new K(50.0);
 var rate   = new r(0.02);
+var yield  = q.None;              // continuous dividend yield; None for a non-payer
 var sigma  = Volatility.Create(0.30);
 var expiry = new Time(1.0);
 
-C price = new BlackScholesCall(spot, strike, rate, q.None, sigma, expiry).Price();</code></pre>
+C price = new BlackScholesCall(spot, strike, rate, yield, sigma, expiry).Price();</code></pre>
 
 <p><code>S</code> isn&rsquo;t a <code>double</code> holding a spot price. It is a spot price. Hand the constructor a <code>K</code> where it wants an <code>S</code> and the build fails. The notation is intact &mdash; you can still read this next to the paper &mdash; and the swap that used to be silent is now a compile error.</p>
 
@@ -240,7 +239,7 @@ var down = new d(up);            // d = 1 / u, and nothing else</code></pre>
 
 <p>C# reserves all-lowercase type names for future keywords, so <code>r</code>, <code>q</code>, <code>u</code>, <code>d</code> and <code>dt</code> all raise <strong>CS8981</strong>. Keeping the notation from the papers means explicitly suppressing a compiler warning. The language is mildly hostile to the premise.</p>
 
-<p>And there&rsquo;s a ceiling: C# has no units of measure. F# does, via <code>[&lt;Measure&gt;]</code>, which descends from Andrew Kennedy&rsquo;s 1996 work on dimension types. Typed constructors get you most of the way. The last stretch isn&rsquo;t available in this language, and no amount of cleverness changes that.</p>
+<p>And there&rsquo;s a ceiling, though it&rsquo;s narrower than I first thought. C# can express a phantom type perfectly well &mdash; an unused generic parameter is enough. What it can&rsquo;t do is <em>infer or compose</em> dimensions. F# can, via <code>[&lt;Measure&gt;]</code>, descended from Andrew Kennedy&rsquo;s 1996 work on dimension types: divide a length by a time there and you get a velocity, checked, without anybody having written that combination down. In C# you enumerate the combinations by hand. That&rsquo;s tolerable for the fifteen quantities here and stops being tolerable well before you&rsquo;d want it to.</p>
 
 <h2>This has names, which I only learned afterwards</h2>
 

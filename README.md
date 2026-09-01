@@ -12,10 +12,11 @@ that actually catches pricing errors. So the types keep the letters.
 var spot   = new S(52.0);
 var strike = new K(50.0);
 var rate   = new r(0.02);
+var yield  = q.None;              // continuous dividend yield; None for a non-payer
 var sigma  = Volatility.Create(0.30);
 var expiry = new Time(1.0);
 
-C price = new BlackScholesCall(spot, strike, rate, q.None, sigma, expiry).Price();
+C price = new BlackScholesCall(spot, strike, rate, yield, sigma, expiry).Price();
 ```
 
 Derived quantities are reachable only through the formula that defines them:
@@ -91,10 +92,11 @@ induction.
 `r`, `q`, `u`, `d` and `dt` all trip **CS8981**: C# reserves all-lowercase type names for
 future keywords, so keeping the notation means suppressing that warning in the csproj.
 
-More fundamentally, C# has no phantom types and no units of measure. F# has `[<Measure>]`.
-Typed constructors get most of the way; the last stretch is not available in this language.
-.NET 7 static abstract interface members would collapse the remaining boilerplate but do
-not move that ceiling.
+More fundamentally, C# cannot infer or compose dimensions. Phantom types are expressible —
+an unused generic parameter is enough — but F#'s `[<Measure>]` will divide a length by a time
+and hand back a velocity without anyone having written that combination down. In C# you
+enumerate the combinations yourself. .NET 7 static abstract interface members would collapse
+the remaining boilerplate but do not move that ceiling.
 
 ## Prior art
 
@@ -107,7 +109,6 @@ language-theory side:
 - **Make illegal states unrepresentable** — Yaron Minsky, argued for financial code in OCaml at Jane Street
 - **Parse, don't validate** — Alexis King; the validating constructors here
 - **Dimension types / units of measure** — Andrew Kennedy's 1996 thesis, later F# `[<Measure>]`
-- **Curry-Howard** — the deep version of "if it compiles, the formula is right"
 
 ## Layout
 

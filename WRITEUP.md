@@ -8,9 +8,7 @@ Nothing in that file stopped you passing volatility where the rate belonged. Not
 
 Let me get the disclaimer out of the way, because it matters for how you read the rest. **I am not a quant.** I have never derived a model. I could not defend a choice of numeraire and I'm not going to pretend otherwise. I've spent seventeen years in and around capital markets, mostly on the engineering side, and my job has generally been the code that still has to work on the Monday after the person who wrote it moved desks.
 
-So I don't look at that file and think about the mathematics. I look at it and think about risk surface. How many ways can this be wrong without anybody noticing? That's the only lens I have, and it's the lens this whole thing came out of.
-
-This wasn't a language experiment for its own sake. It was a genuine attempt to put a better idea on the table for maintainability — to push as much of the checking as possible onto the compiler, because the compiler is the only reviewer that never gets tired, never gets rushed the day before a release, and never assumes somebody else already looked at it. Everything a type can enforce is something a human no longer has to remember to check. That seemed worth trying to prove out rather than just assert.
+So I don't look at that file and think about the mathematics. I look at it and think about risk surface: how many ways can this be wrong without anybody noticing? That's the only lens I have, and what came out of it wasn't a language experiment for its own sake. It was an attempt to put a better idea on the table for maintainability — to push as much of the checking as possible onto the compiler, because the compiler is the only reviewer that never gets tired, never gets rushed the day before a release, and never assumes somebody else already looked at it. Everything a type can enforce is something a human no longer has to remember to check.
 
 ## The fix that doesn't work
 
@@ -28,10 +26,11 @@ That's the whole idea. It took me an embarrassingly long time to get to somethin
 var spot   = new S(52.0);
 var strike = new K(50.0);
 var rate   = new r(0.02);
+var yield  = q.None;              // continuous dividend yield; None for a non-payer
 var sigma  = Volatility.Create(0.30);
 var expiry = new Time(1.0);
 
-C price = new BlackScholesCall(spot, strike, rate, q.None, sigma, expiry).Price();
+C price = new BlackScholesCall(spot, strike, rate, yield, sigma, expiry).Price();
 ```
 
 `S` isn't a `double` holding a spot price. It is a spot price. Hand the constructor a `K` where it wants an `S` and the build fails. The notation is intact — you can still read this next to the paper — and the swap that used to be silent is now a compile error.
@@ -84,7 +83,7 @@ The fix isn't subtle: make the conversions `explicit` and the hole closes. The c
 
 C# reserves all-lowercase type names for future keywords, so `r`, `q`, `u`, `d` and `dt` all raise **CS8981**. Keeping the notation from the papers means explicitly suppressing a compiler warning. The language is mildly hostile to the premise.
 
-And there's a ceiling: C# has no units of measure. F# does, via `[<Measure>]`, which descends from Andrew Kennedy's 1996 work on dimension types. Typed constructors get you most of the way. The last stretch isn't available in this language, and no amount of cleverness changes that.
+And there's a ceiling, though it's narrower than I first thought. C# can express a phantom type perfectly well — an unused generic parameter is enough. What it can't do is *infer or compose* dimensions. F# can, via `[<Measure>]`, descended from Andrew Kennedy's 1996 work on dimension types: divide a length by a time there and you get a velocity, checked, without anybody having written that combination down. In C# you enumerate the combinations by hand. That's tolerable for the fifteen quantities here and stops being tolerable well before you'd want it to.
 
 ## This has names, which I only learned afterwards
 
