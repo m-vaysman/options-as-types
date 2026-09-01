@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>I'm not a quant. I tried to make the compiler check the option pricer anyway.</title>
+<meta name="description" content="An experiment in pushing option-pricing model correctness onto the C# type system: keep the notation from the papers, and make swapping volatility for the rate stop compiling. It half worked.">
+<meta name="author" content="Michael Vaysman">
+<link rel="canonical" href="https://m-vaysman.github.io/options-as-types/">
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="I'm not a quant. I tried to make the compiler check the option pricer anyway.">
+<meta property="og:description" content="An experiment in pushing option-pricing model correctness onto the C# type system: keep the notation from the papers, and make swapping volatility for the rate stop compiling. It half worked.">
+<meta property="og:url" content="https://m-vaysman.github.io/options-as-types/">
+<meta property="og:site_name" content="Michael Vaysman">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="I'm not a quant. I tried to make the compiler check the option pricer anyway.">
+<meta name="twitter:description" content="An experiment in pushing option-pricing model correctness onto the C# type system. It half worked, which is the interesting part.">
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9881;</text></svg>">
+
+<style>
+  :root {
+    --bg: #ffffff;
+    --text: #1c1f23;
+    --muted: #5c6570;
+    --rule: #e3e7ec;
+    --code-bg: #f5f7f9;
+    --code-text: #1c1f23;
+    --link: #0a5fce;
+    --accent: #0a5fce;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1116;
+      --text: #dfe5ec;
+      --muted: #8d97a3;
+      --rule: #262c35;
+      --code-bg: #161b22;
+      --code-text: #dfe5ec;
+      --link: #6cb2ff;
+      --accent: #6cb2ff;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 18px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 41rem;
+    margin: 0 auto;
+    padding: 4rem 1.25rem 6rem;
+  }
+
+  header { margin-bottom: 3rem; }
+
+  h1 {
+    font-size: 2rem;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    margin: 0 0 1rem;
+    font-weight: 650;
+  }
+
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  .meta a { color: var(--muted); }
+
+  h2 {
+    font-size: 1.3rem;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    margin: 3rem 0 1rem;
+    font-weight: 650;
+  }
+
+  p { margin: 0 0 1.25rem; }
+
+  a { color: var(--link); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  strong { font-weight: 650; }
+
+  ul { padding-left: 1.25rem; margin: 0 0 1.25rem; }
+  li { margin-bottom: 0.5rem; }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 0.86em;
+    background: var(--code-bg);
+    padding: 0.15em 0.35em;
+    border-radius: 4px;
+  }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    margin: 0 0 1.5rem;
+    line-height: 1.5;
+  }
+
+  pre code {
+    background: none;
+    padding: 0;
+    font-size: 0.84rem;
+    color: var(--code-text);
+  }
+
+  hr {
+    border: 0;
+    border-top: 1px solid var(--rule);
+    margin: 3.5rem 0;
+  }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  footer .bio { margin-bottom: 0.9rem; }
+  footer .bio strong { color: var(--text); }
+  footer .links { margin: 0; }
+  footer .links a { color: var(--link); }
+  footer .sep { padding: 0 0.4rem; opacity: 0.6; }
+
+  @media (max-width: 34rem) {
+    body { font-size: 17px; }
+    .wrap { padding: 2.5rem 1.1rem 4rem; }
+    h1 { font-size: 1.6rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>I&rsquo;m not a quant. I tried to make the compiler check the option pricer anyway.</h1>
+  <p class="meta">Michael Vaysman &middot; September 2026 &middot; <a href="https://github.com/m-vaysman/options-as-types">source on GitHub</a></p>
+</header>
+
+<article>
+
+<p>Some years ago I opened a pricing file and found about forty <code>double</code>s.</p>
+
+<p>They were named <code>s</code>, <code>k</code>, <code>r</code>, <code>v</code>, <code>t</code>, <code>d1</code>, <code>d2</code>, <code>nd1</code>. There was a comment at the top naming the paper it came from. That comment was the only specification in the file. Everything else was arithmetic on interchangeable numbers.</p>
+
+<p>Nothing in that file stopped you passing volatility where the rate belonged. Nothing stopped a helper returning <code>d1</code> into a variable that meant a price. The compiler had no opinion about any of it, because every quantity in the model had the same type.</p>
+
+<p>Let me get the disclaimer out of the way, because it matters for how you read the rest. <strong>I am not a quant.</strong> I have never derived a model. I could not defend a choice of numeraire and I&rsquo;m not going to pretend otherwise. I&rsquo;ve spent seventeen years in and around capital markets, mostly on the engineering side, and my job has generally been the code that still has to work on the Monday after the person who wrote it moved desks.</p>
+
+<p>So I don&rsquo;t look at that file and think about the mathematics. I look at it and think about risk surface. How many ways can this be wrong without anybody noticing? That&rsquo;s the only lens I have, and it&rsquo;s the lens this whole thing came out of.</p>
+
+<p>This wasn&rsquo;t a language experiment for its own sake. It was a genuine attempt to put a better idea on the table for maintainability &mdash; to push as much of the checking as possible onto the compiler, because the compiler is the only reviewer that never gets tired, never gets rushed the day before a release, and never assumes somebody else already looked at it. Everything a type can enforce is something a human no longer has to remember to check. That seemed worth trying to prove out rather than just assert.</p>
+
+<h2>The fix that doesn&rsquo;t work</h2>
+
+<p>The standard engineering answer is: rename everything. <code>s</code> becomes <code>spotPrice</code>. <code>k</code> becomes <code>strikePrice</code>. <code>v</code> becomes <code>annualisedVolatility</code>. Self-documenting code. Ship it.</p>
+
+<p>Quants hate this, and after watching the argument a few times I came around to their side. The single letters aren&rsquo;t laziness. They&rsquo;re the correspondence with the derivation. When the numbers come out wrong, the review that finds it is someone putting the paper next to the screen and reading down both. Rename the variables and you&rsquo;ve destroyed the only review that reliably works, in exchange for names that were never the actual problem.</p>
+
+<p>And <code>spotPrice</code> and <code>strikePrice</code> are still both <code>double</code>. You can still swap them. All the renaming bought was a longer line.</p>
+
+<h2>So keep the letters, and make them types</h2>
+
+<p>That&rsquo;s the whole idea. It took me an embarrassingly long time to get to something this obvious.</p>
+
+<pre><code>var spot   = new S(52.0);
+var strike = new K(50.0);
+var rate   = new r(0.02);
+var sigma  = Volatility.Create(0.30);
+var expiry = new Time(1.0);
+
+C price = new BlackScholesCall(spot, strike, rate, q.None, sigma, expiry).Price();</code></pre>
+
+<p><code>S</code> isn&rsquo;t a <code>double</code> holding a spot price. It is a spot price. Hand the constructor a <code>K</code> where it wants an <code>S</code> and the build fails. The notation is intact &mdash; you can still read this next to the paper &mdash; and the swap that used to be silent is now a compile error.</p>
+
+<p>Then it gets more interesting, because the derived quantities can be made reachable <em>only</em> through the formula that defines them:</p>
+
+<pre><code>dt step = expiry / steps;        // T / N is, by definition, a step width
+var up   = new u(sigma, step);   // u = exp(sigma * sqrt(dt))
+var down = new d(up);            // d = 1 / u, and nothing else</code></pre>
+
+<p>There is no other way to get a <code>d</code>. It comes from a <code>u</code> or it doesn&rsquo;t exist. That&rsquo;s the part I found genuinely satisfying: the constructor signature <em>is</em> the formula, and the type system is carrying a piece of the model rather than just labelling it.</p>
+
+<p>Feed the binomial tree its inputs and it assembles itself &mdash; step width from time and step count, up-move from volatility and step width, down-move from up-move, risk-neutral probability from all of the above. The constructor ends up reading like the paper&rsquo;s parameter list.</p>
+
+<h2>Where it stopped working</h2>
+
+<p>Two walls, and they&rsquo;re the useful part of this.</p>
+
+<p><strong>Black-Scholes isn&rsquo;t algebraic.</strong> I started by reaching for operator overloading, because that&rsquo;s the obvious tool: define <code>+</code>, <code>-</code>, <code>/</code> between the symbol types and let the price fall out of an expression. It works right up until you need <code>d1</code>, which needs <code>ln</code>. Then it needs <code>exp</code>, then <code>N(&middot;)</code>. Binary operators can&rsquo;t express any of that. The chain breaks, you drop back to raw <code>double</code> arithmetic, and everything you built stops applying at exactly the point the formula gets interesting.</p>
+
+<p><strong>Operators don&rsquo;t scale across a vocabulary this size.</strong> With fifteen symbol types you have a large surface of type pairs that are legal purely because both types exist. I wrote <code>operator -(P, S)</code> &mdash; put price minus spot &mdash; and used it as put intrinsic value. The compiler took it happily. It doesn&rsquo;t denote anything. Put intrinsic is strike minus spot, <code>K - S</code>. I&rsquo;d hung the operator off the wrong type and nothing objected, because operator overloading has no way to know which of the available pairings mean something.</p>
+
+<p>What survived both walls was constructors. <code>new u(sigma, step)</code> is a total function with a typed domain. The signature is the formula. Unwanted combinations don&rsquo;t need to be forbidden, because they were never written. Only the genuinely binary relations kept operators: <code>Time / N -&gt; dt</code>, <code>S - K -&gt; call intrinsic</code>, <code>K - S -&gt; put intrinsic</code>. Three of them. The rest was scaffolding I&rsquo;d built out of enthusiasm.</p>
+
+<h2>The part where I proved my own point by accident</h2>
+
+<p>Every one of these types had an <code>implicit operator double</code>. Without it the arithmetic is unreadable &mdash; you&rsquo;re casting on every line &mdash; so it went in early and I stopped thinking about it.</p>
+
+<p>Here&rsquo;s what I wrote, months later, in the method that computes <code>d1</code>:</p>
+
+<pre><code>public double CalculateD1()
+{
+    var price = (Math.Log(SecurityPrice / StrikePrice) + ...) / ...;
+    return new C(price);
+}</code></pre>
+
+<p><code>C</code> is the type that means <strong>call option price</strong>. <code>d1</code> is a standardised log-moneyness. Those are not the same kind of thing, not remotely, and I wrapped one in the other and shipped it.</p>
+
+<p>It compiled. It produced correct numbers, because the implicit conversion quietly unwrapped it back to a <code>double</code> on the way out. And it was precisely the class of mistake the entire design existed to prevent, waved through by the convenience I&rsquo;d added to make the design pleasant to use.</p>
+
+<p>I don&rsquo;t think I could have written a better argument for the thing than making the error myself, inside the codebase built to stop it. Convenience and enforcement turned out to be the same switch, and I&rsquo;d left it in the convenient position.</p>
+
+<p>The fix isn&rsquo;t subtle: make the conversions <code>explicit</code> and the hole closes. The cost is ceremony on every line of arithmetic, forever. That trade &mdash; not the type design, the trade &mdash; is the actual finding.</p>
+
+<h2>What the language thinks of all this</h2>
+
+<p>C# reserves all-lowercase type names for future keywords, so <code>r</code>, <code>q</code>, <code>u</code>, <code>d</code> and <code>dt</code> all raise <strong>CS8981</strong>. Keeping the notation from the papers means explicitly suppressing a compiler warning. The language is mildly hostile to the premise.</p>
+
+<p>And there&rsquo;s a ceiling: C# has no units of measure. F# does, via <code>[&lt;Measure&gt;]</code>, which descends from Andrew Kennedy&rsquo;s 1996 work on dimension types. Typed constructors get you most of the way. The last stretch isn&rsquo;t available in this language, and no amount of cleverness changes that.</p>
+
+<h2>This has names, which I only learned afterwards</h2>
+
+<p>I got here on my own, staring at that file. I wasn&rsquo;t first, and it turns out I wasn&rsquo;t close to first.</p>
+
+<p>It&rsquo;s <strong>primitive obsession</strong> as the smell, <strong>value objects</strong> or <em>tiny types</em> as the shape, <strong>newtype</strong> if you come from Haskell or Rust, <strong>parse, don&rsquo;t validate</strong> for the validating constructors, and <strong>make illegal states unrepresentable</strong> &mdash; a phrase from Yaron Minsky, who argued it for financial code in OCaml at a trading firm. Which is to say: people with far better credentials than mine hit the same pressure and reached the same conclusion.</p>
+
+<p>I find that reassuring rather than deflating. When people arrive at the same answer from opposite directions &mdash; one from language theory, one from being annoyed at a file &mdash; the answer is probably tracking something real.</p>
+
+<h2>What I actually don&rsquo;t know</h2>
+
+<p>I rebuilt the whole thing properly to write this. Real backward induction instead of the stub I&rsquo;d left, <code>N+1</code> terminal nodes instead of <code>N</code>, dividend yield carried through both models, negative rates allowed because EUR and JPY have both traded there, volatility annualised from log returns, and a test suite that checks put-call parity to 1e-10 and confirms an American call on a non-dividend payer prices identically to the European one. It&rsquo;s here: <a href="https://github.com/m-vaysman/options-as-types">github.com/m-vaysman/options-as-types</a>. Clone it and <code>dotnet run</code>.</p>
+
+<p>What I can&rsquo;t tell you is whether this is a good idea at scale.</p>
+
+<p>A five-thousand-line pricer nobody dares touch, against two hundred lines of types that make the wrong call fail to compile. On paper that&rsquo;s an obvious trade for anyone whose job is reducing the number of ways a thing can be silently wrong. In practice I&rsquo;ve never had to live with it past a demo, and ceremony compounds in ways that are easy to underestimate from here.</p>
+
+<p>I&rsquo;d genuinely like to hear from someone who has. Not whether the types are clever &mdash; whether, two years in, anybody still wanted them.</p>
+
+</article>
+
+<footer>
+  <p class="bio"><strong>Michael Vaysman</strong> builds software for capital markets &mdash; seventeen years of it, on trading desks and on the engineering teams behind them. Mostly C# and SQL Server, mostly the parts that have to still work years later.</p>
+  <p class="links">
+    <a href="https://github.com/m-vaysman/options-as-types">Code and tests</a>
+    <span class="sep">&middot;</span>
+    <a href="https://github.com/m-vaysman">GitHub</a>
+    <span class="sep">&middot;</span>
+    <a href="https://www.linkedin.com/in/michael-v-5961689/">LinkedIn</a>
+  </p>
+</footer>
+
+</div>
+</body>
+</html>
